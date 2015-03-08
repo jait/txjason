@@ -38,7 +38,7 @@ class JSONRPCServerProtocol(NetstringReceiver):
 
     @defer.inlineCallbacks
     def stringReceived(self, string):
-        result = yield self.service.call(string)
+        result = yield self.service.call(string, self)
         if result is not None:
             self.sendString(result)
 

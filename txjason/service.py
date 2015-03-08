@@ -160,7 +160,7 @@ class JSONRPCService(object):
             i.cancel()
 
     @defer.inlineCallbacks
-    def call(self, jsondata):
+    def call(self, jsondata, protocol):
         """
         Calls jsonrpc service's method and returns its return value in a JSON
         string or None if there is none.
@@ -168,14 +168,14 @@ class JSONRPCService(object):
         Arguments:
         jsondata -- remote method call in jsonrpc format
         """
-        result = yield self.call_py(jsondata)
+        result = yield self.call_py(jsondata, protocol)
         if result is None:
             defer.returnValue(None)
         else:
             defer.returnValue(json.dumps(result))
 
     @defer.inlineCallbacks
-    def call_py(self, jsondata):
+    def call_py(self, jsondata, protocol):
         """
         Calls jsonrpc service's method and returns its return value in python
         object format or None if there is none.
@@ -199,7 +199,7 @@ class JSONRPCService(object):
         try:
             if isinstance(rdata, dict) and rdata:
                 # It's a single request.
-                self._fill_request(request, rdata)
+                self._fill_request(request, rdata, protocol)
                 respond = yield self._handle_request(request)
 
                 # Don't respond to notifications
@@ -217,7 +217,7 @@ class JSONRPCService(object):
                     # set some default values for error handling
                     request_ = self._get_default_vals()
                     try:
-                        self._fill_request(request_, rdata_)
+                        self._fill_request(request_, rdata_, protocol)
                     except InvalidRequestError, e:
                         err = self._get_err(e, request_['id'])
                         if err:
@@ -409,7 +409,7 @@ class JSONRPCService(object):
         else:
             return None
 
-    def _fill_request(self, request, rdata):
+    def _fill_request(self, request, rdata, protocol):
         """Fills request with data from the jsonrpc call."""
         if not isinstance(rdata, dict):
             raise InvalidRequestError
@@ -418,11 +418,15 @@ class JSONRPCService(object):
         request['id'] = self._get_id(rdata)
         request['method'] = self._get_method(rdata)
         request['params'] = self._get_params(rdata)
+        request['protocol'] = protocol
 
     @defer.inlineCallbacks
     def _call_method(self, request):
         """Calls given method with given params and returns it value."""
         method = self.method_data[request['method']]['method']
+        if hasattr(method.im_self, 'protocol'):
+            method.im_self.protocol = request['protocol']
+
         params = request['params']
         result = None
         try:
